@@ -20,6 +20,8 @@ class Env2048:
         
         self.update_new_block(update_flag=[True] * n_parallel)
         self.update_new_block(update_flag=[True] * n_parallel)
+        
+        self.i=0
    
     def update_new_block(self, update_flag, new_id=None):
         assert new_id==None
@@ -34,6 +36,8 @@ class Env2048:
             freeblock.remove(new_id)
             
     def moveUpEvent(self, n):
+        score = 0
+        n_merged = 0
         boardstate = self.boardstate[n]
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
@@ -62,11 +66,17 @@ class Env2048:
                 i -= 4
                 gone = True
                 integrated_blocks.append(i)
+                score += boardstate[i]
+                n_merged += 1
             if i != id:
                 move_log.append((id, i, gone))
         if self.action_success[n]:
             self.prev_boardstate[n] = prev_boardstate_buffer
+        
+        return score, n_merged
     def moveDownEvent(self, n):
+        score = 0
+        n_merged = 0
         boardstate = self.boardstate[n]
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
@@ -95,12 +105,17 @@ class Env2048:
                 i += 4
                 gone = True
                 integrated_blocks.append(i)
+                score += boardstate[i]
+                n_merged += 1
             if i != id:
                 move_log.append((id, i, gone))
         if self.action_success[n]:
             self.prev_boardstate[n] = prev_boardstate_buffer
+        return score, n_merged
 
     def moveLeftEvent(self, n):
+        score = 0
+        n_merged = 0
         boardstate = self.boardstate[n]
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
@@ -129,12 +144,17 @@ class Env2048:
                 i -= 1
                 gone = True
                 integrated_blocks.append(i)
+                score += boardstate[i]
+                n_merged += 1
             if i != id:
                 move_log.append((id, i, gone))
         if self.action_success[n]:
             self.prev_boardstate[n] = prev_boardstate_buffer
-                
+        return score, n_merged
+    
     def moveRightEvent(self, n):
+        score = 0
+        n_merged = 0
         boardstate = self.boardstate[n]
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
@@ -163,26 +183,60 @@ class Env2048:
                 i += 1
                 gone = True
                 integrated_blocks.append(i)
+                score += boardstate[i]
+                n_merged += 1
             if i != id:
                 move_log.append((id, i, gone))
         if self.action_success[n]:
             self.prev_boardstate[n] = prev_boardstate_buffer
-    
+        return score, n_merged
     def step(self, actions):
+        score = torch.zeros(self.n_parallel)
+        n_merged = torch.zeros(self.n_parallel)
         act_functions = [self.moveUpEvent, self.moveLeftEvent, self.moveDownEvent, self.moveRightEvent]
         self.action_success = [False for _ in range(self.n_parallel)]
         for n, action in enumerate(actions):
-            act_functions[action](n)
+            score[n], n_merged[n] = act_functions[action](n)
+        game_over_flag = self.__simulateGameOver()
         self.update_new_block(self.action_success)
         
+        return {"state": self.boardstate.clone(), "score": score, "n_merged": n_merged, "done": game_over_flag}
         
+    def __simulateGameOver(self):
+        """simulate move every direction to check whether game is overd or not
+        """
+        action_success_buffer = self.action_success.copy()
+        boardstate_buffer = self.boardstate.clone()
+        prev_boardstate_buffer = self.prev_boardstate.clone()
+        free_block_buffer = [l.copy() for l in self.freeblocks]
+        movable = [False] * self.n_parallel
+        for simulate_function in [self.moveUpEvent, self.moveLeftEvent, self.moveDownEvent, self.moveRightEvent]:
+            for i in range(self.n_parallel):
+                if movable[i]:
+                    continue
+                simulate_function(i)
+                movable[i] = movable[i] or self.action_success[i]
+                
+            ## roll back for next simulation
+            self.action_success = action_success_buffer.copy()
+            self.boardstate = boardstate_buffer.clone()
+            self.prev_boardstate = prev_boardstate_buffer.clone()
+            self.freeblocks = [l.copy() for l in free_block_buffer]
         
+        game_over_flag = torch.tensor([1-g for g in movable])
+        return game_over_flag
+                
         
     
 
 if __name__ == "__main__":
-    env = Env2048(4, (4, 4))
-    print(env.boardstate.reshape(4, 4, 4))
-    env.step([0, 1, 2, 3])
-    print(env.boardstate.reshape(4, 4, 4))
+    env = Env2048(1, (4, 4))
+    print(env.boardstate.reshape(1, 4, 4))
+    for _ in range(1000):
+        move = [random.choice([0, 1, 2, 3])]
+        ans = env.step(move)
+        ans["state"]= ans["state"].reshape(4, 4)
+        ans["action"] = move
+        ans["success"] = env.action_success
+        print(ans)
     
