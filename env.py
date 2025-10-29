@@ -20,9 +20,22 @@ class Env2048:
         
         self.update_new_block(update_flag=[True] * n_parallel)
         self.update_new_block(update_flag=[True] * n_parallel)
+    
+    def reset(self):
+        n_parallel = self.n_parallel
+        self.boardstate = torch.ones(n_parallel, self.state_dim) * -1
+        self.prev_boardstate = torch.ones(n_parallel, self.state_dim) * -1
+        self.freeblocks = [list(range(self.state_dim)) for _ in range(n_parallel)]
+        self.scores = torch.zeros(n_parallel)
+        self.gameoverflag = torch.zeros(n_parallel)
         
-        self.i=0
-   
+        self.move_logs = [[] for _ in range(n_parallel)]
+        
+        self.update_new_block(update_flag=[True] * n_parallel)
+        self.update_new_block(update_flag=[True] * n_parallel)
+        
+    
+    
     def update_new_block(self, update_flag, new_id=None):
         assert new_id==None
         for i in range(self.n_parallel):
@@ -230,13 +243,15 @@ class Env2048:
     
 
 if __name__ == "__main__":
-    env = Env2048(1, (4, 4))
-    print(env.boardstate.reshape(1, 4, 4))
-    for _ in range(1000):
-        move = [random.choice([0, 1, 2, 3])]
-        ans = env.step(move)
-        ans["state"]= ans["state"].reshape(4, 4)
-        ans["action"] = move
-        ans["success"] = env.action_success
-        print(ans)
+    import time
+    from tqdm import tqdm
+    n_pararrel = 1
+    env = Env2048(n_pararrel, (4, 4))
+    for _ in tqdm(range(5000)):
+        env.reset()
+        for _ in (range(300)):
+            move = [random.choice([0, 1, 2, 3]) for _ in range(n_pararrel)]
+            ans = env.step(move)
+    print(ans)
+    
     
