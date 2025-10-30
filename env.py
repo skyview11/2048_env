@@ -55,7 +55,7 @@ class Env2048:
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
         
-        prev_boardstate_buffer = boardstate.clone()
+        prev_boardstate_buffer = boardstate.clone().detach()
         integrated_blocks = []
         row, col = self.board_size
         scan_path = list(range(col, row*col))
@@ -94,7 +94,7 @@ class Env2048:
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
         
-        prev_boardstate_buffer = boardstate.clone()
+        prev_boardstate_buffer = boardstate.clone().detach()
         integrated_blocks = []
         row, col = self.board_size
         scan_path = list(range(row*col-col-1, -1, -1))
@@ -133,7 +133,7 @@ class Env2048:
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
         
-        prev_boardstate_buffer = boardstate.clone()
+        prev_boardstate_buffer = boardstate.clone().detach()
         integrated_blocks = []
         row, col = self.board_size
         scan_path = [c+r*col for c in range(1, col) for r in range(row)]
@@ -172,7 +172,7 @@ class Env2048:
         freeblocks = self.freeblocks[n]
         move_log = self.move_logs[n]
         
-        prev_boardstate_buffer = boardstate.clone()
+        prev_boardstate_buffer = boardstate.clone().detach()
         integrated_blocks = []
         row, col = self.board_size
         scan_path = [c+r*col for c in range(col-2, -1, -1) for r in range(row)]
@@ -213,14 +213,14 @@ class Env2048:
         game_over_flag = self.__simulateGameOver()
         self.update_new_block(self.action_success)
         
-        return {"state": self.boardstate.clone(), "score": score, "n_merged": n_merged, "done": game_over_flag}
+        return {"state": self.boardstate.clone().detach(), "score": score, "n_merged": n_merged, "done": game_over_flag}
         
     def __simulateGameOver(self):
         """simulate move every direction to check whether game is overd or not
         """
         action_success_buffer = self.action_success.copy()
-        boardstate_buffer = self.boardstate.clone()
-        prev_boardstate_buffer = self.prev_boardstate.clone()
+        boardstate_buffer = self.boardstate.clone().detach()
+        prev_boardstate_buffer = self.prev_boardstate.clone().detach()
         free_block_buffer = [l.copy() for l in self.freeblocks]
         movable = [False] * self.n_parallel
         for simulate_function in [self.moveUpEvent, self.moveLeftEvent, self.moveDownEvent, self.moveRightEvent]:
@@ -232,8 +232,8 @@ class Env2048:
                 
             ## roll back for next simulation
             self.action_success = action_success_buffer.copy()
-            self.boardstate = boardstate_buffer.clone()
-            self.prev_boardstate = prev_boardstate_buffer.clone()
+            self.boardstate = boardstate_buffer.clone().detach()
+            self.prev_boardstate = prev_boardstate_buffer.clone().detach()
             self.freeblocks = [l.copy() for l in free_block_buffer]
         
         game_over_flag = torch.tensor([1-g for g in movable])
