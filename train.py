@@ -113,15 +113,16 @@ class DQNAgent:
 
 USE_WANDB = True
 
-exp_name = "run2_continue"
+exp_name = "run3"
 
 
 def encode_state(state):
     encoded_boardstate = state + (state==-1)*2
     encoded_boardstate = torch.log2(encoded_boardstate)
-    encoded_boardstate = encoded_boardstate - max(encoded_boardstate.min(), 1) + 1
+    smallest_nonzero = max(encoded_boardstate.min(), 1)
+    encoded_boardstate = encoded_boardstate - smallest_nonzero + 1
     # encoded_boardstate = encoded_boardstate / encoded_boardstate.max()
-    return encoded_boardstate
+    return encoded_boardstate, smallest_nonzero
 
 if __name__ == "__main__":
     from env import Env2048
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     state_dim = 16
     action_dim = 4
     
-    agent = DQNAgent(state_dim, action_dim, "exp/run2/epoch_latest.pth")
+    agent = DQNAgent(state_dim, action_dim)
     
     if USE_WANDB:
         import wandb
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     for episode in tqdm.tqdm(range(EPISODES)):
         if episode != 0:
             env.reset()
-        state = encode_state(env.boardstate)
+        state, smallest_nonzero = encode_state(env.boardstate)
         total_reward = 0
         moved = 0
         not_moved = 0
@@ -157,14 +158,14 @@ if __name__ == "__main__":
             action = agent.act(state)
             
             info = env.step([action])
-            next_state, reward, done = info["state"][0], float(info["score"][0]), float(info["done"][0])
-            next_state = encode_state(torch.tensor(next_state))
+            next_state, score, done = info["state"][0], float(info["score"][0]), float(info["done"][0])
+            next_state, _ = encode_state(torch.tensor(next_state))
             
             ##################################################
             ## reward tuning
             
             ## 기본 공식
-            reward = reward * 0.01
+            reward = score / (2**smallest_nonzero) * 0.01
             # if done: ## 패배시 패널티
             #     # reward -= 1000 * (episode//100 + 1)
             #     reward -= 1000
